@@ -8,6 +8,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace ClientApp
 {
@@ -19,6 +20,7 @@ namespace ClientApp
         static string colour = ConfigurationManager.AppSettings.Get("Colour");
         static StringBuilder sb = new StringBuilder();
         static Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+        static string s;
 
         static void Main(string[] args)
         {
@@ -30,28 +32,16 @@ namespace ClientApp
                 Console.WriteLine("Connected to the server!");
 
                 NetworkStream ns = client.GetStream();
-                Thread thread = new Thread(o => ReceiveData((TcpClient)o));
-
+                Thread thread = new Thread(async o =>  await ReceiveData((TcpClient)o));
                 thread.Start(client);
 
-                
-                string s;
-
-                while (!string.IsNullOrEmpty((s = Console.ReadLine())))
+                while (true)
                 {
+                    s = Console.ReadLine();
                     DeletePrevConsoleLine();
                     HandleUserCommands(s, ns);
                     sb.Clear();
                 }
-
-                client.Client.Shutdown(SocketShutdown.Send);
-                thread.Join();
-
-                ns.Close();
-                client.Close();
-
-                Console.WriteLine("Disconnected from the server!!");
-                Console.ReadKey();
             }
             catch (Exception e)
             {
@@ -60,7 +50,7 @@ namespace ClientApp
             }
         }
 
-        static async void ReceiveData(TcpClient client)
+        static async Task ReceiveData(TcpClient client)
         {
             NetworkStream ns = client.GetStream();
             byte[] receivedBytes = new byte[1024];
@@ -71,6 +61,18 @@ namespace ClientApp
                 var dataReceived = Encoding.ASCII.GetString(receivedBytes, 0, byte_count);
                 var remoteUserColour = dataReceived.Substring(0,7);
                 Console.ForegroundColor = StringToConsoleColorConverter(remoteUserColour);
+
+                try
+                {
+                    if (s.Length > 0)
+                    {
+                        Console.WriteLine();
+                        DeletePrevConsoleLine();
+                    }
+                }
+                catch (Exception)
+                {}
+
                 Console.Write(dataReceived.Remove(0,7));
                 Console.ForegroundColor = StringToConsoleColorConverter(colour);
             }
@@ -158,10 +160,18 @@ namespace ClientApp
 
         private static void DeletePrevConsoleLine()
         {
+            var lineCount = (s.Length / Console.WindowWidth) + 1;
+
             if (Console.CursorTop == 0) return;
-            Console.SetCursorPosition(0, Console.CursorTop - 1);
-            Console.Write(new string(' ', Console.WindowWidth));
-            Console.SetCursorPosition(0, Console.CursorTop - 1);
+
+            Console.SetCursorPosition(0, Console.CursorTop - lineCount);
+
+            for (int i = 0; i <= lineCount; i++)
+            {
+                Console.Write(new string(' ', Console.WindowWidth));
+            }
+
+            Console.SetCursorPosition(0, Console.CursorTop - (lineCount -1));
         }
 
 
